@@ -1,0 +1,269 @@
+\section{Detection Playbooks}
+
+Detection playbooks translate knowledge of adversary behavior into concrete, repeatable logic that can run continuously in Splunk 
+or Microsoft Sentinel. Unlike hunting playbooks, which are exploratory and analyst-driven, detection playbooks are designed for 
+automation: they define what to look for, how to detect it, how to investigate it, and how to tune it over time. For a CTI analyst 
+or detection engineer, these playbooks form the backbone of a mature detection program and serve as a long-term reference for 
+building and maintaining high-fidelity alerts.
+
+Each detection playbook in this section follows a consistent structure. It begins with a short description of the behavior and 
+why it matters, followed by the required telemetry. Then it provides SPL and KQL detection logic, along with Linux investigation 
+commands where relevant. Finally, it discusses tuning considerations and common sources of false positives. The goal is not only 
+to provide queries, but to explain how and why they work, so that they can be adapted to different environments and threat landscapes.
+
+\subsection*{Detection Playbook: Encoded PowerShell Commands}
+
+\textbf{Behavior and Rationale}
+
+Adversaries frequently abuse PowerShell to execute malicious code, download payloads, or perform reconnaissance. 
+To evade simple string-based detections, they often use the \texttt{-EncodedCommand} parameter, which allows them to 
+supply Base64-encoded commands. This behavior is highly suspicious in most environments and is a strong candidate for 
+a high-priority detection, especially on servers and high-value endpoints.
+
+\textbf{Required Telemetry}
+
+This detection relies on detailed process creation logs that include command-line arguments. On Windows, Sysmon Event ID 1 or 
+Windows Event ID 4688 with full command-line logging is ideal. In Splunk, these events are typically found in indexes such as 
+\texttt{sysmon} or \texttt{wineventlog}. In Sentinel, the equivalent data is often in \texttt{Sysmon} or \texttt{SecurityEvent} tables.
+
+\textbf{SPL Detection Logic}
+\begin{lstlisting}
+index=sysmon EventCode=1 Image="*powershell.exe"
+| search CommandLine="*EncodedCommand*"
+| stats count by Computer, User, ParentImage, Image, CommandLine
+| where count >= 1
+\end{lstlisting}
+
+\textbf{KQL Detection Logic}
+\begin{lstlisting}
+Sysmon
+| where EventID == 1 and Image endswith "powershell.exe"
+| where CommandLine contains "EncodedCommand"
+| summarize Count=count() by Computer, User, ParentImage, Image, CommandLine
+| where Count >= 1
+\end{lstlisting}
+
+This logic looks for any PowerShell process that includes the \texttt{EncodedCommand} parameter. In many environments, even 
+a single occurrence is worth investigating. The aggregation step (\texttt{stats} / \texttt{summarize}) helps group similar 
+events and makes it easier to review repeated activity.
+
+\textbf{Linux Investigation Pivot}
+
+On systems with Sysmon for Linux or similar logging, analysts can pivot from SIEM detections to local logs:
+
+\begin{lstlisting}[language=bash]
+grep -i "powershell" /var/log/sysmon/sysmon.log | grep -i "EncodedCommand"
+\end{lstlisting}
+
+\textbf{Tuning and False Positives}
+
+Some administrative scripts or management tools may legitimately use encoded PowerShell, especially in automation-heavy environments. 
+To reduce noise, detections can be tuned by excluding known management accounts, specific hosts (such as configuration servers), 
+or known-good scripts. Over time, a whitelist of expected encoded PowerShell usage can be maintained, while all other occurrences 
+remain high-priority alerts.
+
+\subsection*{Detection Playbook: Excessive Failed Logons}
+
+\textbf{Behavior and Rationale}
+
+Repeated failed logons are a classic indicator of brute-force attacks, password spraying, or credential guessing. While individual 
+failures are common and often benign, patterns of repeated failures against specific accounts or from specific hosts are 
+highly suspicious. Detecting these patterns early helps prevent account compromise and lateral movement.
+
+\textbf{Required Telemetry}
+
+On Windows, failed logons are recorded as Event ID 4625 in the Security log. In Splunk, these events are typically found in 
+\texttt{wineventlog} or similar indexes. In Sentinel, they appear in the \texttt{SecurityEvent} table. For Linux, failed SSH 
+logons are recorded in \texttt{/var/log/auth.log}.
+
+\textbf{SPL Detection Logic}
+\begin{lstlisting}
+index=wineventlog EventCode=4625
+| stats count by AccountName, WorkstationName
+| where count > 10
+\end{lstlisting}
+
+\textbf{KQL Detection Logic}
+\begin{lstlisting}
+SecurityEvent
+| where EventID == 4625
+| summarize Count=count() by Account, Workstation
+| where Count > 10
+\end{lstlisting}
+
+This detection identifies accounts that have more than ten failed logons from a given workstation. 
+The threshold can be adjusted based on the environment’s normal behavior. In high-noise environments, it may be useful to 
+add a time window (for example, failures within one hour) to focus on concentrated attack patterns.
+
+\textbf{Linux Investigation Pivot}
+
+On Linux systems, failed SSH logons can be reviewed directly:
+
+\begin{lstlisting}[language=bash]
+grep "Failed password" /var/log/auth.log | awk '{print $9}' | sort | uniq -c
+\end{lstlisting}
+
+This command shows how many times each user has experienced failed logons, which can be correlated with SIEM detections.
+
+\textbf{Tuning and False Positives}
+
+False positives often arise from misconfigured services, automated scripts with outdated credentials, or users repeatedly 
+entering incorrect passwords. Tuning should focus on excluding known noisy systems and service accounts, while maintaining 
+strict thresholds for privileged accounts and high-value targets. Additional context, such as geolocation or device type, 
+can further improve fidelity.
+
+\subsection*{Detection Playbook: Rare Parent-Child Process Relationships}
+
+\textbf{Behavior and Rationale}
+
+Legitimate processes tend to follow predictable parent-child relationships. For example, \texttt{explorer.exe} commonly 
+spawns user applications, while \texttt{services.exe} spawns services. When an unusual parent process launches a sensitive 
+child process (such as a scripting engine or system tool), it may indicate process injection, masquerading, or other malicious activity.
+Detecting rare parent-child combinations is a powerful behavioral technique.
+
+\textbf{Required Telemetry}
+
+This detection relies on detailed process creation logs with parent and child process information. 
+Sysmon Event ID 1 is ideal, as it includes \texttt{ParentImage} and \texttt{Image} fields. In Splunk, 
+these events are typically stored in a \texttt{sysmon} index; in Sentinel, they appear in the \texttt{Sysmon} table.
+
+\textbf{SPL Detection Logic}
+\begin{lstlisting}
+index=sysmon EventCode=1
+| stats count by ParentImage, Image
+| where count < 3
+\end{lstlisting}
+
+\textbf{KQL Detection Logic}
+\begin{lstlisting}
+Sysmon
+| where EventID == 1
+| summarize Count=count() by ParentImage, Image
+| where Count < 3
+\end{lstlisting}
+
+This detection highlights parent-child pairs that occur fewer than three times in the dataset. 
+These rare combinations are strong candidates for further investigation. In practice, this detection 
+is often run over a rolling time window (for example, the last seven days) to reflect current behavior.
+
+\textbf{Linux Investigation Pivot}
+
+On Linux, process relationships can be inspected using \texttt{ps} and \texttt{pstree}:
+
+\begin{lstlisting}[language=bash]
+ps aux --forest
+\end{lstlisting}
+
+This view helps analysts confirm whether a suspicious process tree observed in SIEM logs is legitimate or malicious.
+
+\textbf{Tuning and False Positives}
+
+Rare does not always mean malicious. New software deployments, updates, or one-time administrative tasks can create 
+unusual process chains. Tuning involves building a baseline of known-good rare pairs and excluding them from future 
+alerts. Over time, the detection should focus on truly unexpected combinations, especially those involving 
+scripting engines, interpreters, or administrative tools.
+
+\subsection*{Detection Playbook: Rare Outbound Network Connections}
+
+\textbf{Behavior and Rationale}
+
+Compromised hosts often communicate with external command-and-control servers or exfiltration endpoints that are 
+not part of normal business operations. These connections are typically low-frequency and may target unusual 
+ports or IP addresses. Detecting rare outbound connections helps identify such activity, especially when combined with CTI enrichment.
+
+\textbf{Required Telemetry}
+
+This detection relies on network connection logs that include destination IPs and ports. Sysmon Event ID 3 provides 
+this information on Windows. In Splunk, these events are often stored in a \texttt{sysmon} or network index; in Sentinel, 
+they appear in the \texttt{Sysmon} table or dedicated network tables.
+
+\textbf{SPL Detection Logic}
+\begin{lstlisting}
+index=sysmon EventCode=3
+| stats count by DestinationIp, DestinationPort
+| where count < 5
+\end{lstlisting}
+
+\textbf{KQL Detection Logic}
+\begin{lstlisting}
+Sysmon
+| where EventID == 3
+| summarize Count=count() by DestinationIp, DestinationPort
+| where Count < 5
+\end{lstlisting}
+
+This detection surfaces destination IP and port combinations that appear fewer than five times in the dataset. 
+These rare connections can then be enriched with CTI (for example, checking against threat feeds) to determine whether 
+they are associated with known malicious infrastructure.
+
+\textbf{Linux Investigation Pivot}
+
+On Linux, active connections can be inspected with:
+
+\begin{lstlisting}[language=bash]
+ss -tulnp
+\end{lstlisting}
+
+This command shows listening and established connections, along with associated processes, which can be correlated with SIEM detections.
+
+\textbf{Tuning and False Positives}
+
+False positives may include legitimate but infrequent connections, such as one-off vendor support sessions or new cloud services. 
+Tuning should focus on excluding known business destinations and internal infrastructure, while maintaining strict scrutiny for 
+unknown external IPs, unusual ports, and connections from high-value systems.
+
+\subsection*{Detection Playbook: Persistence via Scheduled Tasks and Cron Jobs}
+
+\textbf{Behavior and Rationale}
+
+Persistence mechanisms allow adversaries to maintain access to a system even after reboots or user logouts. On Windows, 
+scheduled tasks are a common persistence technique; on Linux, cron jobs serve a similar purpose. Detecting the creation or 
+modification of these mechanisms is critical for identifying long-term footholds.
+
+\textbf{Required Telemetry}
+
+On Windows, scheduled task creation is recorded as Event ID 4698 in the Security log and may also appear in Task Scheduler logs. 
+In Splunk, these events are typically found in \texttt{wineventlog}. In Sentinel, they appear in the \texttt{SecurityEvent} table. 
+On Linux, cron configurations are stored in \texttt{/etc/crontab}, \texttt{/etc/cron.d/}, and user-specific cron files.
+
+\textbf{SPL Detection Logic}
+\begin{lstlisting}
+index=wineventlog EventCode=4698
+| table _time, Computer, TaskName, Author, Command
+\end{lstlisting}
+
+\textbf{KQL Detection Logic}
+\begin{lstlisting}
+SecurityEvent
+| where EventID == 4698
+| project TimeGenerated, Computer, TaskName, SubjectUserName, Command
+\end{lstlisting}
+
+This detection surfaces newly created scheduled tasks, including the task name, author, and command. In many environments, 
+scheduled task creation is relatively rare and should be closely monitored, especially on servers and high-value endpoints.
+
+\textbf{Linux Investigation Pivot}
+
+On Linux, cron-based persistence can be reviewed with:
+
+\begin{lstlisting}[language=bash]
+cat /etc/crontab
+ls -al /etc/cron.d/
+crontab -l
+\end{lstlisting}
+
+These commands reveal system-wide and user-specific cron jobs, which can be compared against known-good configurations.
+
+\textbf{Tuning and False Positives}
+
+Legitimate administrative tasks, backup jobs, and monitoring scripts often use scheduled tasks or cron jobs. Tuning should 
+focus on identifying expected tasks (by name, author, or command) and excluding them from alerts. New or modified tasks that 
+execute scripting engines, interpreters, or binaries from unusual paths should remain high-priority.
+
+\subsection*{Summary}
+
+The detection playbooks in this section illustrate how to move from abstract knowledge of adversary behavior to concrete, 
+automated logic in Splunk and Sentinel. Each playbook combines behavioral focus, clear telemetry requirements, SPL and KQL 
+implementations, Linux investigation pivots, and practical tuning guidance. Over time, these playbooks can be expanded, refined, 
+and adapted to new threats, forming a living detection library that supports your long-term growth as a CTI analyst, 
+threat hunter, and detection engineer.

@@ -1,0 +1,108 @@
+\section{Splunk and SPL Fundamentals}
+
+Splunk is one of the most widely used platforms for log analysis, threat hunting, and detection engineering. 
+Its strength lies in its ability to ingest large volumes of telemetry from diverse sources and make that data 
+searchable in near real time. For a CTI analyst or threat hunter, Splunk becomes the primary interface for 
+understanding system behavior, identifying anomalies, and validating hypotheses. This section introduces the 
+core concepts of Splunk and its query language, SPL, in a way that supports long-term analytical work.
+
+At its core, SPL (Search Processing Language) is designed to filter, transform, and analyze event data. 
+Most SPL searches follow a simple pattern: start with an index, apply filters, and then use commands such as 
+\texttt{stats}, \texttt{table}, or \texttt{eval} to shape the results. The goal is not to memorize every command, 
+but to understand how to combine them to answer investigative questions. Because many organizations also rely 
+on Microsoft Sentinel, each SPL example here is paired with an equivalent KQL version to reinforce cross-platform skills.
+
+\subsection*{Basic Search Structure}
+
+Before diving into threat hunting examples, it is useful to understand the basic structure of an SPL search. 
+The following example retrieves Windows process creation events from Sysmon:
+
+\textbf{SPL Example}
+\begin{lstlisting}
+index=sysmon EventCode=1
+| table _time, Computer, User, Image, CommandLine
+\end{lstlisting}
+
+\textbf{KQL Equivalent}
+\begin{lstlisting}
+Sysmon
+| where EventID == 1
+| project TimeGenerated, Computer, User, Image, CommandLine
+\end{lstlisting}
+
+This simple pattern—filter, then shape—is the foundation of nearly every SPL and KQL query you will write.
+
+\subsection*{Filtering and Field Matching}
+
+Filtering is one of the most important skills in SPL. Analysts often begin with broad searches and gradually narrow 
+them down as they learn more about the activity. The following example searches for PowerShell executions that include 
+encoded commands, a common sign of obfuscation:
+
+\textbf{SPL Example}
+\begin{lstlisting}
+index=wineventlog EventCode=4104
+| search CommandLine="*EncodedCommand*"
+\end{lstlisting}
+
+\textbf{KQL Equivalent}
+\begin{lstlisting}
+PowerShellEvent
+| where EventID == 4104
+| where CommandLine contains "EncodedCommand"
+\end{lstlisting}
+
+These types of queries are frequently used in threat hunting, detection engineering, and CTI validation.
+
+\subsection*{Aggregation and Pattern Analysis}
+
+Threat hunters often need to identify unusual patterns rather than single events. Aggregation commands such as 
+\texttt{stats} allow analysts to group events and look for anomalies. The following example identifies accounts with 
+repeated failed logons:
+
+\textbf{SPL Example}
+\begin{lstlisting}
+index=wineventlog EventCode=4625
+| stats count by AccountName, WorkstationName
+| where count > 10
+\end{lstlisting}
+
+\textbf{KQL Equivalent}
+\begin{lstlisting}
+SecurityEvent
+| where EventID == 4625
+| summarize Count=count() by Account, Workstation
+| where Count > 10
+\end{lstlisting}
+
+This type of aggregation is foundational for detecting brute-force attempts, credential misuse, and lateral movement.
+
+\subsection*{Process Relationships}
+
+Understanding parent-child process relationships is essential for detecting suspicious execution chains. 
+SPL makes this easy by correlating fields such as \texttt{ParentImage} and \texttt{Image}. The following example 
+highlights unusual parent-child pairs:
+
+\textbf{SPL Example}
+\begin{lstlisting}
+index=sysmon EventCode=1
+| stats count by ParentImage, Image
+| where count < 5
+\end{lstlisting}
+
+\textbf{KQL Equivalent}
+\begin{lstlisting}
+Sysmon
+| where EventID == 1
+| summarize Count=count() by ParentImage, Image
+| where Count < 5
+\end{lstlisting}
+
+This is a common technique in threat hunting to identify rare or suspicious execution paths.
+
+\subsection*{Why These Fundamentals Matter}
+
+These examples form the foundation of nearly all detection and hunting work. Whether you are validating CTI findings, 
+building dashboards, or investigating an alert, the ability to quickly filter, aggregate, and correlate telemetry is essential. 
+As the handbook progresses, these fundamentals will be expanded into full detection patterns, hunting playbooks, 
+and dashboard designs that reflect real-world analyst workflows.
+

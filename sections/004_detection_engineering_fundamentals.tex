@@ -1,0 +1,96 @@
+\section{Detection Engineering Fundamentals}
+
+Detection engineering focuses on identifying the behaviors, patterns, and signals that indicate malicious 
+activity within an environment. While threat hunting is exploratory and hypothesis-driven, detection engineering 
+is structured and repeatable. The goal is to translate knowledge of adversary behavior into reliable, high-fidelity 
+detections that operate continuously in a SIEM such as Splunk or Microsoft Sentinel. This section introduces the 
+foundational concepts and provides practical SPL and KQL examples that reflect real-world detection workflows.
+
+A good detection begins with understanding the behavior you want to identify. Instead of relying on static indicators 
+such as IP addresses or file hashes, modern detections focus on techniques—how an adversary executes code, moves laterally, 
+steals credentials, or evades defenses. These behaviors tend to be more stable over time and more resilient to simple 
+changes in tooling. For example, while a malware family may change its command-and-control infrastructure frequently, 
+its use of encoded PowerShell commands or suspicious parent-child process chains often remains consistent.
+
+One of the most common detection patterns involves monitoring for suspicious command-line activity. PowerShell is frequently 
+abused by adversaries because it is built into Windows and provides extensive system access. The following example detects 
+encoded PowerShell commands, which are often used to hide malicious intent:
+
+\textbf{SPL Example}
+\begin{lstlisting}
+index=sysmon EventCode=1 Image="*powershell.exe"
+| search CommandLine="*EncodedCommand*"
+| table _time, Computer, User, ParentImage, Image, CommandLine
+\end{lstlisting}
+
+\textbf{KQL Equivalent}
+\begin{lstlisting}
+Sysmon
+| where EventID == 1 and Image endswith "powershell.exe"
+| where CommandLine contains "EncodedCommand"
+| project TimeGenerated, Computer, User, ParentImage, Image, CommandLine
+\end{lstlisting}
+
+Another foundational detection pattern focuses on parent-child process anomalies. Legitimate processes tend to follow 
+predictable execution chains, while malicious activity often introduces unusual or rare combinations. The following 
+example identifies uncommon parent-child pairs:
+
+\textbf{SPL Example}
+\begin{lstlisting}
+index=sysmon EventCode=1
+| stats count by ParentImage, Image
+| where count < 3
+\end{lstlisting}
+
+\textbf{KQL Equivalent}
+\begin{lstlisting}
+Sysmon
+| where EventID == 1
+| summarize Count=count() by ParentImage, Image
+| where Count < 3
+\end{lstlisting}
+
+Authentication-based detections are equally important. Excessive failed logons, unusual logon types, or logons from unexpected 
+hosts can indicate credential misuse or lateral movement. The following example identifies accounts with repeated failed logons:
+
+\textbf{SPL Example}
+\begin{lstlisting}
+index=wineventlog EventCode=4625
+| stats count by AccountName, WorkstationName
+| where count > 10
+\end{lstlisting}
+
+\textbf{KQL Equivalent}
+\begin{lstlisting}
+SecurityEvent
+| where EventID == 4625
+| summarize Count=count() by Account, Workstation
+| where Count > 10
+\end{lstlisting}
+
+Network-based detections help identify command-and-control activity, data exfiltration, or lateral movement. Rare outbound 
+connections are often a strong signal of malicious behavior:
+
+\textbf{SPL Example}
+\begin{lstlisting}
+index=sysmon EventCode=3
+| stats count by DestinationIp, DestinationPort
+| where count < 5
+\end{lstlisting}
+
+\textbf{KQL Equivalent}
+\begin{lstlisting}
+Sysmon
+| where EventID == 3
+| summarize Count=count() by DestinationIp, DestinationPort
+| where Count < 5
+\end{lstlisting}
+
+Effective detection engineering also requires tuning and validation. A detection should be tested against real telemetry to 
+ensure it produces meaningful results without overwhelming analysts with noise. This often involves adding filters, whitelisting 
+known-good activity, or enriching events with additional context. Over time, detections should be reviewed and updated as 
+adversary behavior evolves or as new telemetry sources become available.
+
+The examples in this section represent the core building blocks of detection engineering: identifying suspicious behavior, 
+correlating related events, and transforming threat intelligence into actionable, automated logic. These fundamentals will 
+be expanded in later sections into full detection patterns, dashboards, and playbooks that reflect real-world adversary techniques.

@@ -1,0 +1,92 @@
+\documentclass[12pt]{report}
+
+% ------------------------------------------------------------
+% Packages
+% ------------------------------------------------------------
+\usepackage[a4paper,margin=1in]{geometry}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{hyperref}
+\usepackage{bookmark}
+\usepackage{setspace}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{color}
+
+% ------------------------------------------------------------
+% Fix fancyhdr headheight warning
+% ------------------------------------------------------------
+\setlength{\headheight}{14.49998pt}
+\addtolength{\topmargin}{-2.49998pt}
+
+% ------------------------------------------------------------
+% Listings Style
+% ------------------------------------------------------------
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    keywordstyle=\color{blue},
+    commentstyle=\color{gray},
+    stringstyle=\color{red}
+}
+
+% ------------------------------------------------------------
+% Header / Footer
+% ------------------------------------------------------------
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{Advanced Threat Analysis Handbook}
+\fancyhead[R]{\leftmark}
+\fancyfoot[C]{\thepage}
+
+% ------------------------------------------------------------
+% Title Page
+% ------------------------------------------------------------
+\begin{document}
+
+\begin{titlepage}
+    \centering
+    \vspace*{2cm}
+
+    {\Huge \textbf{Advanced Threat Analysis and Detection Engineering Handbook}}\
+
+\vspace{0.5cm}
+
+    {\Large A Comprehensive Guide for CTI, Threat Hunting, and Detection Engineering}\
+
+\vspace{2cm}
+
+    {\large Leonard}\
+
+\vspace{0.5cm}
+    {\large Toronto, Canada}\
+
+\vspace{2cm}
+
+    \vfill
+    {\large \today}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% ------------------------------------------------------------
+% Content Imports
+% ------------------------------------------------------------
+
+\input{sections/001_introduction.tex}
+\input{sections/002_spl_fundamentals.tex}
+\input{sections/003_threat_hunting_fundamentals.tex}
+\input{sections/004_detection_engineering_fundamentals.tex}
+\input{sections/005_dashboard_design.tex}
+\input{sections/006_linux_investigations.tex}
+\input{sections/007_cti_workflows.tex}
+\input{sections/008_threat_hunting_playbooks.tex}
+\input{sections/009_detection_playbooks.tex}
+\input{sections/010_advanced_detection_patterns.tex}
+
+% ------------------------------------------------------------
+% End
+% ------------------------------------------------------------
+\end{document}
