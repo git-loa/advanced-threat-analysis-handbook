@@ -11,7 +11,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Install TeX Live
       run: |
@@ -25,7 +25,7 @@ jobs:
         pdflatex -interaction=nonstopmode -output-directory build/pdf main.tex
 
     - name: Upload PDF artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: handbook-pdf
         path: build/pdf/main.pdf
