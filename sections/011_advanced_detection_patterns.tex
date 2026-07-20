@@ -1,0 +1,227 @@
+\section{Advanced Detection Patterns}
+
+Advanced detection engineering focuses on identifying subtle, high‑value behaviors that adversaries rely on to evade 
+defenses, escalate privileges, and maintain persistence. These patterns go beyond simple indicators or basic anomalies; 
+they capture underlying techniques that remain consistent even as tooling, infrastructure, and malware families evolve. 
+As noted in the source document, “these patterns provide a deep understanding of how behaviors manifest in telemetry and 
+how to detect them reliably in enterprise environments.” 
+
+Each pattern includes SPL and KQL logic, Linux investigation pivots, and an explanation of why the behavior matters.
+
+% --------------------------------------------------------------------
+% PATTERN 1: Parent PID Spoofing
+% --------------------------------------------------------------------
+
+\subsection*{Detection Pattern: Parent PID Spoofing}
+
+\textbf{Behavior and Rationale}
+
+Parent PID spoofing occurs when an adversary manipulates the parent process ID of a newly created process to make it appear 
+as though it was launched by a legitimate parent. The document explains that “this technique is used to evade behavioral 
+detections that rely on parent-child relationships.” Detecting this behavior requires identifying inconsistencies between 
+expected and observed parent-child relationships.
+
+\textbf{SPL Detection Logic}
+
+\begin{lstlisting}
+index=sysmon EventCode=1
+| eval expected_parent=case(
+    Image="*powershell.exe", "explorer.exe",
+    Image="*cmd.exe", "explorer.exe",
+    Image="*wscript.exe", "explorer.exe",
+    1==1, "unknown")
+| where NOT like(ParentImage, "%" . expected_parent . "%")
+| table _time, Computer, User, ParentImage, Image, CommandLine
+\end{lstlisting}
+
+\textbf{KQL Detection Logic}
+
+\begin{lstlisting}
+Sysmon
+| where EventID == 1
+| extend ExpectedParent = case(
+    Image endswith "powershell.exe", "explorer.exe",
+    Image endswith "cmd.exe", "explorer.exe",
+    Image endswith "wscript.exe", "explorer.exe",
+    "unknown")
+| where ParentImage !contains ExpectedParent
+| project TimeGenerated, Computer, User, ParentImage, Image, CommandLine
+\end{lstlisting}
+
+\textbf{Linux Pivot}
+
+\begin{lstlisting}[language=bash]
+ps -eo pid,ppid,cmd --forest
+\end{lstlisting}
+
+\textbf{Explanation}
+
+This detection identifies processes whose parent does not match expected norms. While not all mismatches are malicious, 
+unexpected parent-child relationships are strong indicators of process injection, hollowing, or spoofing.
+
+% --------------------------------------------------------------------
+% PATTERN 2: LOLBins Abuse
+% --------------------------------------------------------------------
+
+\subsection*{Detection Pattern: LOLBins Abuse}
+
+\textbf{Behavior and Rationale}
+
+Living‑off‑the‑land binaries (LOLBins) are legitimate system tools that adversaries abuse to execute code, download payloads, 
+or evade detection. Examples include \texttt{certutil}, \texttt{mshta}, \texttt{wmic}, and \texttt{rundll32}. The document notes 
+that “traditional signature-based detections often fail, so behavioral detections must focus on unusual usage patterns.”
+
+\textbf{SPL Detection Logic}
+
+\begin{lstlisting}
+index=sysmon EventCode=1
+| search Image IN ("*certutil.exe", "*mshta.exe", "*wmic.exe", "*rundll32.exe")
+| table _time, Computer, User, ParentImage, Image, CommandLine
+\end{lstlisting}
+
+\textbf{KQL Detection Logic}
+
+\begin{lstlisting}
+Sysmon
+| where EventID == 1
+| where Image endswith "certutil.exe"
+    or Image endswith "mshta.exe"
+    or Image endswith "wmic.exe"
+    or Image endswith "rundll32.exe"
+| project TimeGenerated, Computer, User, ParentImage, Image, CommandLine
+\end{lstlisting}
+
+\textbf{Linux Pivot}
+
+\begin{lstlisting}[language=bash]
+grep -E "curl|wget|python|perl" /var/log/syslog
+\end{lstlisting}
+
+\textbf{Explanation}
+
+This detection highlights execution of high‑risk binaries. Analysts should pay close attention to suspicious arguments such as 
+Base64 strings, remote URLs, or script execution flags.
+
+% --------------------------------------------------------------------
+% PATTERN 3: Credential Dumping Behavior
+% --------------------------------------------------------------------
+
+\subsection*{Detection Pattern: Credential Dumping Behavior}
+
+\textbf{Behavior and Rationale}
+
+Credential dumping enables adversaries to escalate privileges and move laterally. Tools such as Mimikatz or LSASS memory readers 
+interact with sensitive processes. The document states that “detecting credential dumping requires monitoring for access to LSASS, 
+suspicious handle requests, or unusual process memory reads.”
+
+\textbf{SPL Detection Logic}
+
+\begin{lstlisting}
+index=sysmon EventCode=10 TargetImage="*lsass.exe"
+| table _time, Computer, User, SourceImage, TargetImage, GrantedAccess
+\end{lstlisting}
+
+\textbf{KQL Detection Logic}
+
+\begin{lstlisting}
+Sysmon
+| where EventID == 10 and TargetImage endswith "lsass.exe"
+| project TimeGenerated, Computer, User, SourceImage, TargetImage, GrantedAccess
+\end{lstlisting}
+
+\textbf{Linux Pivot}
+
+\begin{lstlisting}[language=bash]
+grep -i "shadow" /var/log/auth.log
+\end{lstlisting}
+
+\textbf{Explanation}
+
+Sysmon Event ID 10 captures process access attempts. Any process attempting to access LSASS with high privileges is suspicious 
+and should be investigated immediately.
+
+% --------------------------------------------------------------------
+% PATTERN 4: Registry-Based Persistence
+% --------------------------------------------------------------------
+
+\subsection*{Detection Pattern: Registry-Based Persistence}
+
+\textbf{Behavior and Rationale}
+
+Adversaries frequently use registry keys such as \texttt{Run}, \texttt{RunOnce}, and \texttt{Services} to establish persistence. 
+The document explains that “detecting modifications to these keys is essential for identifying long-term footholds.”
+
+\textbf{SPL Detection Logic}
+
+\begin{lstlisting}
+index=sysmon EventCode=13
+| search TargetObject="*\\Run*" OR TargetObject="*\\RunOnce*"
+| table _time, Computer, User, TargetObject, Details
+\end{lstlisting}
+
+\textbf{KQL Detection Logic}
+
+\begin{lstlisting}
+Sysmon
+| where EventID == 13
+| where TargetObject contains "\\Run" or TargetObject contains "\\RunOnce"
+| project TimeGenerated, Computer, User, TargetObject, Details
+\end{lstlisting}
+
+\textbf{Linux Pivot}
+
+\begin{lstlisting}[language=bash]
+ls -al ~/.config/autostart/
+\end{lstlisting}
+
+\textbf{Explanation}
+
+Registry persistence is common in malware. Analysts should validate whether the modified entry corresponds to legitimate software.
+
+% --------------------------------------------------------------------
+% PATTERN 5: Suspicious Service Creation
+% --------------------------------------------------------------------
+
+\subsection*{Detection Pattern: Suspicious Service Creation}
+
+\textbf{Behavior and Rationale}
+
+Creating or modifying services is a powerful persistence and privilege escalation technique. The document notes that “service 
+creation is rare in most environments and should be treated as high-risk unless associated with known administrative activity.”
+
+\textbf{SPL Detection Logic}
+
+\begin{lstlisting}
+index=wineventlog EventCode=7045
+| table _time, ServiceName, ImagePath, StartType, AccountName
+\end{lstlisting}
+
+\textbf{KQL Detection Logic}
+
+\begin{lstlisting}
+SecurityEvent
+| where EventID == 7045
+| project TimeGenerated, ServiceName, ImagePath, StartType, Account
+\end{lstlisting}
+
+\textbf{Linux Pivot}
+
+\begin{lstlisting}[language=bash]
+systemctl list-units --type=service
+\end{lstlisting}
+
+\textbf{Explanation}
+
+Service creation should be monitored closely, especially when the service executes binaries from unusual paths or runs under 
+privileged accounts.
+
+% --------------------------------------------------------------------
+% SUMMARY
+% --------------------------------------------------------------------
+
+\subsection*{Summary}
+
+The advanced detection patterns in this chapter focus on behaviors that adversaries rely on to evade defenses and maintain access. 
+As the source document states, “these patterns form the foundation of a mature detection engineering program and support long-term 
+operational resilience.” By implementing these SPL and KQL detections and validating them with Linux pivots, analysts can build 
+high-fidelity detections that remain effective even as threats evolve.

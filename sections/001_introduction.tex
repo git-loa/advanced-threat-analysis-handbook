@@ -1,24 +1,25 @@
 \section{Introduction}
 
-Security operations rely on the ability to interpret activity across systems, networks, and users. 
-This handbook is designed as a practical, long-term reference for CTI analysts, threat hunters, 
-and detection engineers who work with Splunk, Microsoft Sentinel, Linux systems, and enterprise telemetry. 
-The focus is on real-world techniques, not abstract theory—everything included here is meant to support 
+Security operations rely on the ability to interpret activity across systems, networks, identities, and applications. 
+This handbook is designed as a practical, long-term reference for CTI analysts, threat hunters, and detection engineers 
+who work with Splunk, Microsoft Sentinel, Linux systems, Windows telemetry, and enterprise-scale data sources. 
+The focus throughout is on real-world techniques rather than abstract theory—every section is written to support 
 investigations, detection logic, and day-to-day analytical work.
 
-Splunk and its query language, SPL, remain central tools for log analysis and threat hunting. 
+Modern SIEM platforms such as Splunk and Microsoft Sentinel form the backbone of enterprise visibility. 
+Splunk and its query language, SPL, remain central tools for log analysis, threat hunting, and detection engineering. 
 They allow analysts to explore telemetry, identify suspicious behavior, and build detections with precision. 
-Because many organizations also rely on Microsoft Sentinel, each SPL example in this handbook is paired with 
-an equivalent KQL version. This dual approach ensures that the concepts and workflows you learn are transferable 
+Because many organizations also rely on Microsoft Sentinel, each SPL example in this handbook is paired with an 
+equivalent KQL version. This dual approach ensures that the concepts and workflows you learn are transferable 
 across platforms, strengthening your versatility as an analyst.
 
-Threat hunting and CTI work require a strong understanding of how systems behave under normal conditions and how adversaries 
-attempt to evade detection. To support this, the handbook includes Linux command references, process inspection techniques, 
-and network investigation commands that are essential during hunts and incident response. These commands complement the 
-SPL and KQL examples, giving you both endpoint-level and SIEM-level visibility.
+Effective threat hunting and CTI work require a strong understanding of how systems behave under normal conditions 
+and how adversaries attempt to evade detection. To support this, the handbook includes Windows event analysis, 
+Linux command references, process inspection techniques, and network investigation commands that are essential 
+during hunts and incident response. These endpoint-level techniques complement the SPL and KQL examples, giving 
+you visibility across both host and SIEM layers.
 
-Throughout the sections that follow, you will find structured examples, detection patterns, dashboard concepts, and practical 
-workflows that reflect real-world analyst tasks. Whether you are building detections, performing hunts, analyzing malware 
-behavior, or designing dashboards, this handbook is intended to serve as a reliable companion as you advance your career in 
-cyber threat intelligence and security operations.
-
+Throughout the sections that follow, you will find structured examples, detection patterns, dashboard concepts, 
+and practical workflows that reflect real-world analyst tasks. Whether you are building detections, performing hunts, 
+analyzing malware behavior, validating CTI findings, or designing dashboards, this handbook is intended to serve as a 
+reliable companion as you advance your career in cyber threat intelligence and security operations.

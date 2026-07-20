@@ -1,17 +1,24 @@
 \section{Threat Hunting Playbooks}
 
 Threat hunting playbooks provide structured, repeatable approaches for investigating specific adversary behaviors. 
-Unlike detections, which run continuously, playbooks guide analysts through deeper manual exploration. 
-Each playbook begins with a hypothesis, identifies relevant telemetry, and provides SPL, KQL, and Linux commands that 
-support the investigation. These playbooks are designed to be practical, adaptable, and aligned with real-world adversary techniques.
+Unlike detections, which run continuously, playbooks guide analysts through deeper manual exploration. Each playbook 
+begins with a hypothesis, identifies relevant telemetry, and provides SPL, KQL, and Linux commands that support the 
+investigation. These playbooks are designed to be practical, adaptable, and aligned with real-world adversary techniques.
+
+% --------------------------------------------------------------------
+% PLAYBOOK 1: Suspicious PowerShell Activity
+% --------------------------------------------------------------------
 
 \subsection*{Playbook: Suspicious PowerShell Activity}
 
-\textbf{Hypothesis:} An adversary is using PowerShell to execute encoded or obfuscated commands.
+\textbf{Hypothesis:}  
+An adversary is using PowerShell to execute encoded or obfuscated commands.
 
-\textbf{Relevant Telemetry:} Sysmon Event ID 1, PowerShell logs (4103, 4104), process command-line arguments.
+\textbf{Relevant Telemetry:}  
+Sysmon Event ID 1, PowerShell logs (4103, 4104), process command-line arguments.
 
 \textbf{SPL Example}
+
 \begin{lstlisting}
 index=sysmon EventCode=1 Image="*powershell.exe"
 | search CommandLine="*EncodedCommand*"
@@ -19,6 +26,7 @@ index=sysmon EventCode=1 Image="*powershell.exe"
 \end{lstlisting}
 
 \textbf{KQL Equivalent}
+
 \begin{lstlisting}
 Sysmon
 | where EventID == 1 and Image endswith "powershell.exe"
@@ -27,19 +35,27 @@ Sysmon
 \end{lstlisting}
 
 \textbf{Linux Pivot (Sysmon for Linux)}
+
 \begin{lstlisting}[language=bash]
 grep -i "powershell" /var/log/sysmon/sysmon.log
 \end{lstlisting}
 
 This playbook helps identify obfuscated execution, a common technique in malware delivery and post-exploitation.
 
+% --------------------------------------------------------------------
+% PLAYBOOK 2: Credential Access Attempts
+% --------------------------------------------------------------------
+
 \subsection*{Playbook: Credential Access Attempts}
 
-\textbf{Hypothesis:} An adversary is attempting to brute-force or misuse credentials.
+\textbf{Hypothesis:}  
+An adversary is attempting to brute-force or misuse credentials.
 
-\textbf{Relevant Telemetry:} Windows Event ID 4625, 4624, Linux auth logs, network logs.
+\textbf{Relevant Telemetry:}  
+Windows Event ID 4625, 4624; Linux auth logs; network logs.
 
 \textbf{SPL Example}
+
 \begin{lstlisting}
 index=wineventlog EventCode=4625
 | stats count by AccountName, WorkstationName
@@ -47,6 +63,7 @@ index=wineventlog EventCode=4625
 \end{lstlisting}
 
 \textbf{KQL Equivalent}
+
 \begin{lstlisting}
 SecurityEvent
 | where EventID == 4625
@@ -55,25 +72,34 @@ SecurityEvent
 \end{lstlisting}
 
 \textbf{Linux Pivot}
+
 \begin{lstlisting}[language=bash]
 grep "Failed password" /var/log/auth.log | awk '{print $9}' | sort | uniq -c
 \end{lstlisting}
 
 This playbook identifies brute-force attempts, password spraying, and compromised accounts.
 
+% --------------------------------------------------------------------
+% PLAYBOOK 3: Lateral Movement via Remote Execution
+% --------------------------------------------------------------------
+
 \subsection*{Playbook: Lateral Movement via Remote Execution}
 
-\textbf{Hypothesis:} An adversary is moving laterally using remote execution tools such as PsExec, WMI, or SSH.
+\textbf{Hypothesis:}  
+An adversary is moving laterally using remote execution tools such as PsExec, WMI, or SSH.
 
-\textbf{Relevant Telemetry:} Sysmon Event ID 1, 3, Windows Event ID 7045, Linux SSH logs.
+\textbf{Relevant Telemetry:}  
+Sysmon Event ID 1, 3; Windows Event ID 7045; Linux SSH logs.
 
 \textbf{SPL Example (PsExec)}
+
 \begin{lstlisting}
 index=sysmon EventCode=1 Image="*psexec*"
 | table _time, Computer, User, ParentImage, Image, CommandLine
 \end{lstlisting}
 
 \textbf{KQL Equivalent}
+
 \begin{lstlisting}
 Sysmon
 | where EventID == 1 and Image contains "psexec"
@@ -81,6 +107,7 @@ Sysmon
 \end{lstlisting}
 
 \textbf{Linux Pivot (SSH)}
+
 \begin{lstlisting}[language=bash]
 grep "Accepted password" /var/log/auth.log
 grep "Failed password" /var/log/auth.log
@@ -88,13 +115,20 @@ grep "Failed password" /var/log/auth.log
 
 This playbook helps identify unauthorized remote execution and lateral movement.
 
+% --------------------------------------------------------------------
+% PLAYBOOK 4: Rare Network Connections
+% --------------------------------------------------------------------
+
 \subsection*{Playbook: Rare Network Connections}
 
-\textbf{Hypothesis:} A compromised host is communicating with an unusual or suspicious external destination.
+\textbf{Hypothesis:}  
+A compromised host is communicating with an unusual or suspicious external destination.
 
-\textbf{Relevant Telemetry:} Sysmon Event ID 3, firewall logs, DNS logs.
+\textbf{Relevant Telemetry:}  
+Sysmon Event ID 3, firewall logs, DNS logs.
 
 \textbf{SPL Example}
+
 \begin{lstlisting}
 index=sysmon EventCode=3
 | stats count by DestinationIp, DestinationPort
@@ -102,6 +136,7 @@ index=sysmon EventCode=3
 \end{lstlisting}
 
 \textbf{KQL Equivalent}
+
 \begin{lstlisting}
 Sysmon
 | where EventID == 3
@@ -110,6 +145,7 @@ Sysmon
 \end{lstlisting}
 
 \textbf{Linux Pivot}
+
 \begin{lstlisting}[language=bash]
 ss -tulnp
 netstat -antp
@@ -117,19 +153,27 @@ netstat -antp
 
 This playbook is effective for identifying command-and-control channels and exfiltration paths.
 
+% --------------------------------------------------------------------
+% PLAYBOOK 5: Persistence Mechanisms
+% --------------------------------------------------------------------
+
 \subsection*{Playbook: Persistence Mechanisms}
 
-\textbf{Hypothesis:} An adversary has established persistence on a host.
+\textbf{Hypothesis:}  
+An adversary has established persistence on a host.
 
-\textbf{Relevant Telemetry:} Scheduled tasks, services, registry modifications, Linux cron jobs.
+\textbf{Relevant Telemetry:}  
+Scheduled tasks, services, registry modifications, Linux cron jobs.
 
 \textbf{SPL Example (Scheduled Tasks)}
+
 \begin{lstlisting}
 index=wineventlog EventCode=4698
 | table _time, TaskName, Author, Command
 \end{lstlisting}
 
 \textbf{KQL Equivalent}
+
 \begin{lstlisting}
 SecurityEvent
 | where EventID == 4698
@@ -137,6 +181,7 @@ SecurityEvent
 \end{lstlisting}
 
 \textbf{Linux Pivot (Cron Jobs)}
+
 \begin{lstlisting}[language=bash]
 cat /etc/crontab
 ls -al /etc/cron.d/
@@ -144,19 +189,27 @@ ls -al /etc/cron.d/
 
 This playbook helps identify long-term footholds established by attackers.
 
+% --------------------------------------------------------------------
+% PLAYBOOK 6: Suspicious File Modifications
+% --------------------------------------------------------------------
+
 \subsection*{Playbook: Suspicious File Modifications}
 
-\textbf{Hypothesis:} An adversary is modifying system files or dropping malicious payloads.
+\textbf{Hypothesis:}  
+An adversary is modifying system files or dropping malicious payloads.
 
-\textbf{Relevant Telemetry:} Sysmon Event ID 11, Linux file modification logs.
+\textbf{Relevant Telemetry:}  
+Sysmon Event ID 11, Linux file modification logs.
 
 \textbf{SPL Example}
+
 \begin{lstlisting}
 index=sysmon EventCode=11
 | table _time, Computer, User, TargetFilename
 \end{lstlisting}
 
 \textbf{KQL Equivalent}
+
 \begin{lstlisting}
 Sysmon
 | where EventID == 11
@@ -164,15 +217,21 @@ Sysmon
 \end{lstlisting}
 
 \textbf{Linux Pivot}
+
 \begin{lstlisting}[language=bash]
 find / -type f -mtime -1 2>/dev/null
 \end{lstlisting}
 
 This playbook is useful for detecting tampering, malware staging, and unauthorized changes.
 
+% --------------------------------------------------------------------
+% PLAYBOOK STRUCTURE SUMMARY
+% --------------------------------------------------------------------
+
 \subsection*{Playbook Structure Summary}
 
 Each playbook follows the same structure:
+
 \begin{itemize}
     \item Hypothesis
     \item Relevant telemetry

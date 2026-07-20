@@ -1,0 +1,281 @@
+\section{Detection Playbooks}
+
+Detection playbooks translate knowledge of adversary behavior into concrete, repeatable logic that can run continuously 
+in Splunk or Microsoft Sentinel. Unlike hunting playbooks, which are exploratory and analyst-driven, detection playbooks 
+are designed for automation: they define what to look for, how to detect it, how to investigate it, and how to tune it 
+over time. As noted in the source document, “these playbooks form the backbone of a mature detection program and serve 
+as a long-term reference for building and maintaining high-fidelity alerts.” 
+
+Each detection playbook follows a consistent structure: a description of the behavior and why it matters, required telemetry, 
+SPL and KQL detection logic, Linux investigation pivots, and tuning considerations. This ensures detections are both 
+actionable and adaptable across environments.
+
+% --------------------------------------------------------------------
+% PLAYBOOK 1: Encoded PowerShell Commands
+% --------------------------------------------------------------------
+
+\subsection*{Detection Playbook: Encoded PowerShell Commands}
+
+\textbf{Behavior and Rationale}
+
+Adversaries frequently abuse PowerShell to execute malicious code, download payloads, or perform reconnaissance. 
+To evade simple string-based detections, they often use the \texttt{-EncodedCommand} parameter, which allows Base64-encoded 
+commands. As the source document states, “this behavior is highly suspicious in most environments and is a strong candidate 
+for a high-priority detection.” 
+
+\textbf{Required Telemetry}
+
+Sysmon Event ID 1 or Windows Event ID 4688 with full command-line logging.  
+Splunk: \texttt{sysmon}, \texttt{wineventlog}  
+Sentinel: \texttt{Sysmon}, \texttt{SecurityEvent}
+
+\textbf{SPL Detection Logic}
+
+\begin{lstlisting}
+index=sysmon EventCode=1 Image="*powershell.exe"
+| search CommandLine="*EncodedCommand*"
+| stats count by Computer, User, ParentImage, Image, CommandLine
+| where count >= 1
+\end{lstlisting}
+
+\textbf{KQL Detection Logic}
+
+\begin{lstlisting}
+Sysmon
+| where EventID == 1 and Image endswith "powershell.exe"
+| where CommandLine contains "EncodedCommand"
+| summarize Count=count() by Computer, User, ParentImage, Image, CommandLine
+| where Count >= 1
+\end{lstlisting}
+
+\textbf{Linux Pivot}
+
+\begin{lstlisting}[language=bash]
+grep -i "powershell" /var/log/sysmon/sysmon.log | grep -i "EncodedCommand"
+\end{lstlisting}
+
+\textbf{Tuning Considerations}
+
+Some administrative scripts legitimately use encoded PowerShell. Tune by excluding:
+
+\begin{itemize}
+    \item known management accounts
+    \item automation servers
+    \item approved scripts
+\end{itemize}
+
+All other occurrences should remain high-priority.
+
+% --------------------------------------------------------------------
+% PLAYBOOK 2: Excessive Failed Logons
+% --------------------------------------------------------------------
+
+\subsection*{Detection Playbook: Excessive Failed Logons}
+
+\textbf{Behavior and Rationale}
+
+Repeated failed logons indicate brute-force attacks, password spraying, or credential guessing. The document notes that 
+“patterns of repeated failures against specific accounts or from specific hosts are highly suspicious.” 
+
+\textbf{Required Telemetry}
+
+Windows: Event ID 4625  
+Linux: \texttt{/var/log/auth.log}
+
+\textbf{SPL Detection Logic}
+
+\begin{lstlisting}
+index=wineventlog EventCode=4625
+| stats count by AccountName, WorkstationName
+| where count > 10
+\end{lstlisting}
+
+\textbf{KQL Detection Logic}
+
+\begin{lstlisting}
+SecurityEvent
+| where EventID == 4625
+| summarize Count=count() by Account, Workstation
+| where Count > 10
+\end{lstlisting}
+
+\textbf{Linux Pivot}
+
+\begin{lstlisting}[language=bash]
+grep "Failed password" /var/log/auth.log | awk '{print $9}' | sort | uniq -c
+\end{lstlisting}
+
+\textbf{Tuning Considerations}
+
+False positives may come from:
+
+\begin{itemize}
+    \item misconfigured services
+    \item outdated credentials in scripts
+    \item users repeatedly entering incorrect passwords
+\end{itemize}
+
+Tune by excluding noisy systems and service accounts.
+
+% --------------------------------------------------------------------
+% PLAYBOOK 3: Rare Parent-Child Process Relationships
+% --------------------------------------------------------------------
+
+\subsection*{Detection Playbook: Rare Parent-Child Process Relationships}
+
+\textbf{Behavior and Rationale}
+
+Legitimate processes follow predictable parent-child relationships. Rare combinations may indicate process injection, 
+masquerading, or malicious execution. The document explains that “detecting rare parent-child combinations is a powerful 
+behavioral technique.” 
+
+\textbf{Required Telemetry}
+
+Sysmon Event ID 1 with \texttt{ParentImage} and \texttt{Image} fields.
+
+\textbf{SPL Detection Logic}
+
+\begin{lstlisting}
+index=sysmon EventCode=1
+| stats count by ParentImage, Image
+| where count < 3
+\end{lstlisting}
+
+\textbf{KQL Detection Logic}
+
+\begin{lstlisting}
+Sysmon
+| where EventID == 1
+| summarize Count=count() by ParentImage, Image
+| where Count < 3
+\end{lstlisting}
+
+\textbf{Linux Pivot}
+
+\begin{lstlisting}[language=bash]
+ps aux --forest
+\end{lstlisting}
+
+\textbf{Tuning Considerations}
+
+Rare does not always mean malicious. Tune by:
+
+\begin{itemize}
+    \item building a baseline of known-good rare pairs
+    \item excluding expected administrative tasks
+    \item focusing on scripting engines and interpreters
+\end{itemize}
+
+% --------------------------------------------------------------------
+% PLAYBOOK 4: Rare Outbound Network Connections
+% --------------------------------------------------------------------
+
+\subsection*{Detection Playbook: Rare Outbound Network Connections}
+
+\textbf{Behavior and Rationale}
+
+Compromised hosts often communicate with external command-and-control servers. These connections are typically low-frequency 
+and target unusual ports. The document states that “detecting rare outbound connections helps identify such activity.” 
+
+\textbf{Required Telemetry}
+
+Sysmon Event ID 3, firewall logs, DNS logs.
+
+\textbf{SPL Detection Logic}
+
+\begin{lstlisting}
+index=sysmon EventCode=3
+| stats count by DestinationIp, DestinationPort
+| where count < 5
+\end{lstlisting}
+
+\textbf{KQL Detection Logic}
+
+\begin{lstlisting}
+Sysmon
+| where EventID == 3
+| summarize Count=count() by DestinationIp, DestinationPort
+| where Count < 5
+\end{lstlisting}
+
+\textbf{Linux Pivot}
+
+\begin{lstlisting}[language=bash]
+ss -tulnp
+\end{lstlisting}
+
+\textbf{Tuning Considerations}
+
+Tune by excluding:
+
+\begin{itemize}
+    \item known vendor support IPs
+    \item internal infrastructure
+    \item expected cloud service endpoints
+\end{itemize}
+
+Focus on unknown external IPs and unusual ports.
+
+% --------------------------------------------------------------------
+% PLAYBOOK 5: Persistence via Scheduled Tasks and Cron Jobs
+% --------------------------------------------------------------------
+
+\subsection*{Detection Playbook: Persistence via Scheduled Tasks and Cron Jobs}
+
+\textbf{Behavior and Rationale}
+
+Scheduled tasks (Windows) and cron jobs (Linux) are common persistence mechanisms. Detecting their creation or modification 
+is critical for identifying long-term footholds.
+
+\textbf{Required Telemetry}
+
+Windows: Event ID 4698  
+Linux: cron configurations in \texttt{/etc/crontab}, \texttt{/etc/cron.d/}, user cron files.
+
+\textbf{SPL Detection Logic}
+
+\begin{lstlisting}
+index=wineventlog EventCode=4698
+| table _time, Computer, TaskName, Author, Command
+\end{lstlisting}
+
+\textbf{KQL Detection Logic}
+
+\begin{lstlisting}
+SecurityEvent
+| where EventID == 4698
+| project TimeGenerated, Computer, TaskName, SubjectUserName, Command
+\end{lstlisting}
+
+\textbf{Linux Pivot}
+
+\begin{lstlisting}[language=bash]
+cat /etc/crontab
+ls -al /etc/cron.d/
+crontab -l
+\end{lstlisting}
+
+\textbf{Tuning Considerations}
+
+Tune by excluding:
+
+\begin{itemize}
+    \item backup jobs
+    \item monitoring scripts
+    \item known administrative tasks
+\end{itemize}
+
+Focus on tasks invoking scripting engines or binaries from unusual paths.
+
+% --------------------------------------------------------------------
+% SUMMARY
+% --------------------------------------------------------------------
+
+\subsection*{Summary}
+
+The detection playbooks in this section illustrate how to move from abstract knowledge of adversary behavior to concrete, 
+automated logic in Splunk and Sentinel. As the document states, “each playbook combines behavioral focus, clear telemetry 
+requirements, SPL and KQL implementations, Linux investigation pivots, and practical tuning guidance.” 
+
+Over time, these playbooks can be expanded, refined, and adapted to new threats, forming a living detection library that 
+supports long-term growth as a CTI analyst, threat hunter, and detection engineer.

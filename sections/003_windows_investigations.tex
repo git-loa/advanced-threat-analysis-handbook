@@ -1,0 +1,169 @@
+\section{Windows Investigations}
+
+Windows systems generate some of the most important telemetry in enterprise environments. 
+Because adversaries frequently target Windows endpoints, domain controllers, and servers, 
+understanding Windows event logs is essential for threat hunting, detection engineering, 
+and CTI validation. This chapter introduces the core Windows telemetry sources, their most 
+important fields, and practical investigation workflows that support real-world analysis.
+
+% --------------------------------------------------------------------
+% SECTION 1: Core Windows Telemetry Sources
+% --------------------------------------------------------------------
+
+\subsection*{Core Windows Telemetry Sources}
+
+Windows produces several categories of logs relevant to security investigations. 
+Each provides unique visibility into attacker behavior:
+
+\begin{itemize}
+    \item \textbf{Security Event Log} — Authentication, authorization, account changes, policy modifications.
+    \item \textbf{Sysmon} — High-fidelity process, network, registry, file, and DNS telemetry.
+    \item \textbf{PowerShell Operational Log} — Script block logging, module loading, command execution.
+    \item \textbf{WMI Activity Log} — WMI persistence, remote execution, system management operations.
+    \item \textbf{Task Scheduler Logs} — Scheduled task creation, modification, and execution.
+\end{itemize}
+
+These sources form the foundation of Windows investigations.
+
+% --------------------------------------------------------------------
+% SECTION 2: Security Event Log Fundamentals
+% --------------------------------------------------------------------
+
+\subsection*{Security Event Log Fundamentals}
+
+The Windows Security Event Log contains authentication events, account activity, and policy changes. 
+Some of the most important Event IDs include:
+
+\begin{itemize}
+    \item \textbf{4624} — Successful logon
+    \item \textbf{4625} — Failed logon
+    \item \textbf{4672} — Special privileges assigned
+    \item \textbf{4720} — User account created
+    \item \textbf{4722} — User account enabled
+    \item \textbf{4723/4724} — Password reset or change
+    \item \textbf{4768/4769} — Kerberos ticket activity
+\end{itemize}
+
+These events are essential for identity investigations, brute-force detection, and lateral movement analysis.
+
+\textbf{Example SPL Query}
+
+\begin{lstlisting}
+index=wineventlog EventCode=4625
+| stats count by AccountName, WorkstationName
+| where count > 10
+\end{lstlisting}
+
+% --------------------------------------------------------------------
+% SECTION 3: Sysmon Fundamentals
+% --------------------------------------------------------------------
+
+\subsection*{Sysmon Fundamentals}
+
+Sysmon provides detailed endpoint telemetry that is invaluable for threat hunting. 
+Key Event Codes include:
+
+\begin{itemize}
+    \item \textbf{1} — Process creation
+    \item \textbf{3} — Network connection
+    \item \textbf{7} — Image loaded
+    \item \textbf{11} — File created
+    \item \textbf{13} — Registry modification
+    \item \textbf{22} — DNS query
+\end{itemize}
+
+Sysmon is particularly useful for detecting execution chains, malware behavior, and suspicious parent-child relationships.
+
+\textbf{Example SPL Query}
+
+\begin{lstlisting}
+index=sysmon EventCode=1
+| table _time, Computer, User, ParentImage, Image, CommandLine
+\end{lstlisting}
+
+% --------------------------------------------------------------------
+% SECTION 4: PowerShell Logging
+% --------------------------------------------------------------------
+
+\subsection*{PowerShell Logging}
+
+PowerShell is a common tool for both administrators and adversaries. 
+The most important PowerShell logs include:
+
+\begin{itemize}
+    \item \textbf{4103} — Module logging
+    \item \textbf{4104} — Script block logging
+    \item \textbf{600} — Engine lifecycle events
+\end{itemize}
+
+Script block logging (4104) is especially valuable for detecting encoded or obfuscated commands.
+
+\textbf{Example SPL Query}
+
+\begin{lstlisting}
+index=wineventlog EventCode=4104
+| search CommandLine="*EncodedCommand*"
+\end{lstlisting}
+
+% --------------------------------------------------------------------
+% SECTION 5: WMI Investigations
+% --------------------------------------------------------------------
+
+\subsection*{WMI Investigations}
+
+WMI is frequently used for remote execution, persistence, and reconnaissance. 
+Relevant logs include:
+
+\begin{itemize}
+    \item \textbf{Microsoft-Windows-WMI-Activity/Operational}
+    \item \textbf{WMI-Activity}
+\end{itemize}
+
+\textbf{Example SPL Query}
+
+\begin{lstlisting}
+index=wineventlog sourcetype="WMI-Activity"
+| stats count by Operation, User
+\end{lstlisting}
+
+% --------------------------------------------------------------------
+% SECTION 6: Common Investigation Workflows
+% --------------------------------------------------------------------
+
+\subsection*{Common Investigation Workflows}
+
+Windows investigations often follow repeatable patterns. 
+The following SPL examples demonstrate practical workflows used in threat hunting and detection engineering.
+
+\textbf{1. Process Chain Analysis}
+
+\begin{lstlisting}
+index=sysmon EventCode=1
+| stats count by ParentImage, Image
+| where count < 5
+\end{lstlisting}
+
+\textbf{2. Authentication Pattern Analysis}
+
+\begin{lstlisting}
+index=wineventlog EventCode=4625
+| stats count by AccountName, WorkstationName
+\end{lstlisting}
+
+\textbf{3. PowerShell Abuse Detection}
+
+\begin{lstlisting}
+index=wineventlog EventCode=4104
+| search CommandLine="*EncodedCommand*"
+\end{lstlisting}
+
+% --------------------------------------------------------------------
+% SECTION 7: Why Windows Investigations Matter
+% --------------------------------------------------------------------
+
+\subsection*{Why Windows Investigations Matter}
+
+Windows telemetry provides visibility into authentication, execution, persistence, and lateral movement. 
+Mastering these logs is essential for threat hunting, detection engineering, and CTI validation. 
+Later chapters build on these fundamentals to create full hunting playbooks, detection logic, and advanced patterns 
+that reflect real-world analyst workflows.

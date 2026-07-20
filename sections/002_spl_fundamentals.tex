@@ -3,63 +3,220 @@
 Splunk is one of the most widely used platforms for log analysis, threat hunting, and detection engineering. 
 Its strength lies in its ability to ingest large volumes of telemetry from diverse sources and make that data 
 searchable in near real time. For a CTI analyst or threat hunter, Splunk becomes the primary interface for 
-understanding system behavior, identifying anomalies, and validating hypotheses. This section introduces the 
-core concepts of Splunk and its query language, SPL, in a way that supports long-term analytical work.
+understanding system behavior, identifying anomalies, and validating hypotheses. This chapter introduces Splunk's 
+data model, environment exploration workflow, and the core concepts of SPL in a coherent, practical sequence.
 
-At its core, SPL (Search Processing Language) is designed to filter, transform, and analyze event data. 
+% --------------------------------------------------------------------
+% SECTION 1: How Splunk Stores Data
+% --------------------------------------------------------------------
+
+\subsection*{Understanding the Splunk Data Model}
+
+Before writing SPL, it is essential to understand how Splunk organizes data. Splunk does not use tables or rows. 
+Instead, it stores event data using the following hierarchy:
+
+\begin{itemize}
+    \item \textbf{Index} — A storage location for events (e.g., \texttt{sysmon}, \texttt{wineventlog}, \texttt{o365}).
+    \item \textbf{Sourcetype} — The format of the log (e.g., \texttt{WinEventLog:Security}, \texttt{XmlWinEventLog}, \texttt{syslog}).
+    \item \textbf{Host} — The system or device sending the logs.
+    \item \textbf{Fields} — Key-value pairs extracted from each event.
+    \item \textbf{Event} — A single log entry.
+\end{itemize}
+
+Understanding this hierarchy is foundational for threat hunting, detection engineering, and CTI validation.
+
+% --------------------------------------------------------------------
+% SECTION 2: Exploring Your Splunk Environment
+% --------------------------------------------------------------------
+
+\subsection*{Exploring Your Splunk Environment}
+
+New analysts often enter Splunk without knowing where logs live, which indexes exist, or what fields are available. 
+Because Splunk environments vary widely, it is essential to have a repeatable workflow for discovering data sources. 
+The following steps work in any environment, including those where UI features such as \textit{Data Summary} are disabled.
+
+\textbf{List All Indexes}
+
+To reliably list all indexes your role can access:
+
+\begin{lstlisting}
+| eventcount summarize=false index=*
+\end{lstlisting}
+
+This command works in all Splunk environments and does not require elevated permissions.
+
+\textbf{Why \texttt{metadata type=index} May Fail}
+
+Some Splunk roles do not permit index enumeration using:
+
+\begin{lstlisting}
+| metadata type=index
+\end{lstlisting}
+
+In restricted environments, only the following metadata types are allowed:
+
+\begin{itemize}
+    \item hosts
+    \item sources
+    \item sourcetypes
+\end{itemize}
+
+For example:
+
+\begin{lstlisting}
+| metadata type=sourcetypes
+\end{lstlisting}
+
+This provides sourcetype-level visibility even when index metadata is restricted.
+
+\textbf{Discover Sourcetypes}
+
+To list all sourcetypes across all indexes:
+
+\begin{lstlisting}
+index=* 
+| stats count by sourcetype
+\end{lstlisting}
+
+Sourcetypes represent log formats such as Windows Security logs, Sysmon, Linux audit logs, cloud identity logs, 
+network telemetry, or endpoint events.
+
+\textbf{Discover Hosts}
+
+To identify log sources:
+
+\begin{lstlisting}
+index=* 
+| stats count by host
+\end{lstlisting}
+
+Hosts represent systems, servers, or devices sending logs into Splunk.
+
+\textbf{Explore Fields}
+
+To view all fields extracted by Splunk:
+
+\begin{lstlisting}
+index=* 
+| fieldsummary
+\end{lstlisting}
+
+This command provides a complete inventory of available metadata, including field names, value distributions, 
+and cardinality.
+
+\textbf{Inspect Raw Events}
+
+To inspect raw logs and manually identify fields:
+
+\begin{lstlisting}
+index=* | head 20
+\end{lstlisting}
+
+Use the Splunk Web \textit{Fields} sidebar to explore extracted fields and understand how Splunk interprets the data.
+
+\textbf{Identify Index for a Known Sourcetype}
+
+If you know the sourcetype but not the index:
+
+\begin{lstlisting}
+sourcetype=WinEventLog:Security
+| stats count by index
+\end{lstlisting}
+
+Splunk will reveal the index containing that sourcetype.
+
+% --------------------------------------------------------------------
+% SECTION 3: Splunk Field Exploration Cheat Sheet
+% --------------------------------------------------------------------
+
+\subsection*{Splunk Field Exploration Cheat Sheet}
+
+Understanding fields is essential for threat hunting, detection engineering, and CTI validation. 
+The following commands provide a practical workflow for discovering, inspecting, and validating fields 
+in any dataset.
+
+\begin{itemize}
+    \item \textbf{List all fields in results}
+    \begin{lstlisting}
+    | fieldsummary
+    \end{lstlisting}
+
+    \item \textbf{Show all fields with their values}
+    \begin{lstlisting}
+    | stats values(*) as *
+    \end{lstlisting}
+
+    \item \textbf{Show only specific fields}
+    \begin{lstlisting}
+    | fields user, src, dest
+    \end{lstlisting}
+
+    \item \textbf{Remove fields}
+    \begin{lstlisting}
+    | fields - _raw, _time
+    \end{lstlisting}
+
+    \item \textbf{Inspect raw logs}
+    \begin{lstlisting}
+    | head 20
+    \end{lstlisting}
+
+    \item \textbf{Force Splunk to extract fields from raw logs}
+    \begin{lstlisting}
+    | extract
+    \end{lstlisting}
+
+    \item \textbf{Field distributions (UI)}
+    In Splunk Web, click any field in the sidebar to view:
+    \begin{itemize}
+        \item top values
+        \item rare values
+        \item field cardinality
+    \end{itemize}
+\end{itemize}
+
+% --------------------------------------------------------------------
+% SECTION 4: SPL Fundamentals
+% --------------------------------------------------------------------
+
+\subsection*{SPL Fundamentals}
+
+With the environment understood, the next step is learning how SPL queries are structured. 
 Most SPL searches follow a simple pattern: start with an index, apply filters, and then use commands such as 
-\texttt{stats}, \texttt{table}, or \texttt{eval} to shape the results. The goal is not to memorize every command, 
-but to understand how to combine them to answer investigative questions. Because many organizations also rely 
-on Microsoft Sentinel, each SPL example here is paired with an equivalent KQL version to reinforce cross-platform skills.
+\texttt{stats}, \texttt{table}, or \texttt{eval} to shape the results.
 
-\subsection*{Basic Search Structure}
+\textbf{Basic Search Structure}
 
-Before diving into threat hunting examples, it is useful to understand the basic structure of an SPL search. 
-The following example retrieves Windows process creation events from Sysmon:
-
-\textbf{SPL Example}
 \begin{lstlisting}
 index=sysmon EventCode=1
 | table _time, Computer, User, Image, CommandLine
 \end{lstlisting}
 
 \textbf{KQL Equivalent}
+
 \begin{lstlisting}
 Sysmon
 | where EventID == 1
 | project TimeGenerated, Computer, User, Image, CommandLine
 \end{lstlisting}
 
-This simple pattern—filter, then shape—is the foundation of nearly every SPL and KQL query you will write.
+\textbf{Filtering and Field Matching}
 
-\subsection*{Filtering and Field Matching}
-
-Filtering is one of the most important skills in SPL. Analysts often begin with broad searches and gradually narrow 
-them down as they learn more about the activity. The following example searches for PowerShell executions that include 
-encoded commands, a common sign of obfuscation:
-
-\textbf{SPL Example}
 \begin{lstlisting}
 index=wineventlog EventCode=4104
 | search CommandLine="*EncodedCommand*"
 \end{lstlisting}
 
 \textbf{KQL Equivalent}
+
 \begin{lstlisting}
 PowerShellEvent
 | where EventID == 4104
 | where CommandLine contains "EncodedCommand"
 \end{lstlisting}
 
-These types of queries are frequently used in threat hunting, detection engineering, and CTI validation.
+\textbf{Aggregation and Pattern Analysis}
 
-\subsection*{Aggregation and Pattern Analysis}
-
-Threat hunters often need to identify unusual patterns rather than single events. Aggregation commands such as 
-\texttt{stats} allow analysts to group events and look for anomalies. The following example identifies accounts with 
-repeated failed logons:
-
-\textbf{SPL Example}
 \begin{lstlisting}
 index=wineventlog EventCode=4625
 | stats count by AccountName, WorkstationName
@@ -67,6 +224,7 @@ index=wineventlog EventCode=4625
 \end{lstlisting}
 
 \textbf{KQL Equivalent}
+
 \begin{lstlisting}
 SecurityEvent
 | where EventID == 4625
@@ -74,15 +232,8 @@ SecurityEvent
 | where Count > 10
 \end{lstlisting}
 
-This type of aggregation is foundational for detecting brute-force attempts, credential misuse, and lateral movement.
+\textbf{Process Relationships}
 
-\subsection*{Process Relationships}
-
-Understanding parent-child process relationships is essential for detecting suspicious execution chains. 
-SPL makes this easy by correlating fields such as \texttt{ParentImage} and \texttt{Image}. The following example 
-highlights unusual parent-child pairs:
-
-\textbf{SPL Example}
 \begin{lstlisting}
 index=sysmon EventCode=1
 | stats count by ParentImage, Image
@@ -90,6 +241,7 @@ index=sysmon EventCode=1
 \end{lstlisting}
 
 \textbf{KQL Equivalent}
+
 \begin{lstlisting}
 Sysmon
 | where EventID == 1
@@ -97,7 +249,9 @@ Sysmon
 | where Count < 5
 \end{lstlisting}
 
-This is a common technique in threat hunting to identify rare or suspicious execution paths.
+% --------------------------------------------------------------------
+% SECTION 5: Why These Fundamentals Matter
+% --------------------------------------------------------------------
 
 \subsection*{Why These Fundamentals Matter}
 
@@ -105,4 +259,3 @@ These examples form the foundation of nearly all detection and hunting work. Whe
 building dashboards, or investigating an alert, the ability to quickly filter, aggregate, and correlate telemetry is essential. 
 As the handbook progresses, these fundamentals will be expanded into full detection patterns, hunting playbooks, 
 and dashboard designs that reflect real-world analyst workflows.
-

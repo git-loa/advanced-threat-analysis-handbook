@@ -1,0 +1,161 @@
+\section{CTI Workflows}
+
+Cyber Threat Intelligence becomes most valuable when it directly supports operational teams. Effective CTI workflows 
+bridge the gap between intelligence reporting and hands-on defensive work by transforming threat insights into practical 
+actions. For a CTI analyst, threat hunter, or detection engineer, the goal is not simply to collect intelligence but to 
+operationalize it—turning adversary behaviors into hypotheses, detections, dashboards, and investigative leads. This 
+chapter outlines the core workflows that enable CTI to drive meaningful security outcomes.
+
+% --------------------------------------------------------------------
+% SECTION 1: Identifying Relevant Intelligence
+% --------------------------------------------------------------------
+
+\subsection*{Identifying Relevant Intelligence}
+
+A CTI workflow begins with identifying intelligence that matters to the organization. This may come from:
+
+\begin{itemize}
+    \item threat reports
+    \item malware analysis
+    \item internal telemetry
+    \item external intelligence feeds
+\end{itemize}
+
+The analyst evaluates the intelligence to determine which behaviors, techniques, or infrastructure are relevant. 
+Instead of focusing on short-lived indicators such as IP addresses or domains, modern CTI emphasizes techniques—how 
+the adversary gains access, executes code, moves laterally, or evades detection. These behaviors form the foundation 
+for operational work.
+
+% --------------------------------------------------------------------
+% SECTION 2: Translating Intelligence into Operational Questions
+% --------------------------------------------------------------------
+
+\subsection*{Translating Intelligence into Operational Questions}
+
+Once relevant behaviors are identified, the next step is translation. CTI analysts convert high-level intelligence 
+into concrete questions that can be answered with telemetry.
+
+For example:
+
+\begin{itemize}
+    \item Intelligence: “Threat actor uses encoded PowerShell commands.”
+    \item Operational question: “Where in our environment do we see PowerShell with encoded commands?”
+\end{itemize}
+
+This translation step is critical because it connects intelligence to the data sources available in Splunk or Sentinel.
+
+% --------------------------------------------------------------------
+% SECTION 3: CTI-Driven Threat Hunting
+% --------------------------------------------------------------------
+
+\subsection*{CTI-Driven Threat Hunting}
+
+The translated intelligence becomes the basis for threat hunting. Analysts use SPL or KQL to search for behaviors 
+associated with the threat actor.
+
+\textbf{SPL Example}
+
+\begin{lstlisting}
+index=sysmon EventCode=1 Image="*powershell.exe"
+| search CommandLine="*EncodedCommand*"
+| table _time, Computer, User, ParentImage, Image, CommandLine
+\end{lstlisting}
+
+\textbf{KQL Equivalent}
+
+\begin{lstlisting}
+Sysmon
+| where EventID == 1 and Image endswith "powershell.exe"
+| where CommandLine contains "EncodedCommand"
+| project TimeGenerated, Computer, User, ParentImage, Image, CommandLine
+\end{lstlisting}
+
+If the hunt reveals suspicious activity, the workflow moves into detection engineering.
+
+% --------------------------------------------------------------------
+% SECTION 4: CTI-Driven Detection Engineering
+% --------------------------------------------------------------------
+
+\subsection*{CTI-Driven Detection Engineering}
+
+When CTI-driven hunts uncover suspicious behavior, the next step is to refine the behavioral pattern into a repeatable 
+detection. This ensures that the organization is protected not only against the current threat but also against future 
+variants that use the same technique.
+
+Examples include:
+
+\begin{itemize}
+    \item encoded PowerShell execution
+    \item unusual parent-child process chains
+    \item suspicious authentication patterns
+    \item rare outbound network connections
+\end{itemize}
+
+CTI provides the adversary context; detection engineering converts it into automated logic.
+
+% --------------------------------------------------------------------
+% SECTION 5: CTI-Driven Dashboard Design
+% --------------------------------------------------------------------
+
+\subsection*{CTI-Driven Dashboard Design}
+
+CTI workflows also support dashboard creation. Intelligence about adversary behavior informs which panels should be 
+included in dashboards and how they should be structured.
+
+For example:
+
+\begin{itemize}
+    \item If a threat actor uses scheduled tasks for persistence → include a panel for scheduled task creation.
+    \item If an actor relies on PowerShell → include a panel for PowerShell execution trends.
+    \item If an actor uses rare outbound connections → include a panel for low-frequency network activity.
+\end{itemize}
+
+CTI ensures dashboards remain aligned with real-world threats rather than generic system activity.
+
+% --------------------------------------------------------------------
+% SECTION 6: Enrichment Workflows
+% --------------------------------------------------------------------
+
+\subsection*{Enrichment Workflows}
+
+CTI also enhances investigations through enrichment. When analysts encounter suspicious events in Splunk or Sentinel, 
+CTI provides context that helps determine whether the activity is benign or malicious.
+
+Examples include:
+
+\begin{itemize}
+    \item enriching suspicious domains with threat actor associations
+    \item enriching IP addresses with geolocation or reputation
+    \item enriching file hashes with malware family information
+\end{itemize}
+
+Enrichment accelerates investigations and improves decision-making.
+
+% --------------------------------------------------------------------
+% SECTION 7: Feedback Loops
+% --------------------------------------------------------------------
+
+\subsection*{Feedback Loops}
+
+CTI workflows rely on feedback loops. Threat hunters, SOC analysts, and detection engineers provide insight into:
+
+\begin{itemize}
+    \item which intelligence is useful
+    \item which detections generate noise
+    \item which dashboards need refinement
+\end{itemize}
+
+This feedback helps refine intelligence requirements and ensures that CTI remains aligned with operational needs. 
+Over time, this iterative process strengthens the organization’s defensive posture and improves the quality of both 
+intelligence and detections.
+
+% --------------------------------------------------------------------
+% SECTION 8: Why CTI Workflows Matter
+% --------------------------------------------------------------------
+
+\subsection*{Why CTI Workflows Matter}
+
+The workflows described in this chapter form the backbone of operational CTI. By connecting intelligence to telemetry, 
+hunts, detections, dashboards, and investigations, CTI becomes a practical force multiplier rather than a theoretical 
+exercise. Later chapters expand these workflows into full playbooks and detection patterns tailored to specific adversary 
+techniques.

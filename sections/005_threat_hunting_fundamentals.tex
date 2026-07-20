@@ -1,0 +1,161 @@
+\section{Threat Hunting Fundamentals}
+
+Threat hunting is the proactive search for adversary activity that has evaded automated detection. 
+Unlike alert triage, hunting begins without a predefined signal; instead, the analyst forms hypotheses 
+based on telemetry, threat intelligence, and knowledge of system behavior. The goal is to identify subtle 
+patterns, weak signals, and behavioral anomalies that indicate malicious activity. This chapter introduces 
+the core mindset and techniques used in modern threat hunting, supported by SPL and KQL examples that reflect 
+real investigative workflows.
+
+% --------------------------------------------------------------------
+% SECTION 1: The Threat Hunting Mindset
+% --------------------------------------------------------------------
+
+\subsection*{The Threat Hunting Mindset}
+
+Threat hunting is driven by curiosity, pattern recognition, and an understanding of how adversaries operate. 
+A hunt typically begins with a hypothesis. This hypothesis can be driven by:
+
+\begin{itemize}
+    \item \textbf{Threat intelligence} — “A threat actor is known to use encoded PowerShell commands.”
+    \item \textbf{Telemetry anomalies} — “There is a spike in failed logons.”
+    \item \textbf{Environmental knowledge} — “This server should never initiate outbound connections.”
+\end{itemize}
+
+Once a hypothesis is defined, the hunter uses SPL or KQL to explore relevant telemetry, pivot across related 
+events, and refine the search until meaningful patterns emerge. This iterative process is what separates hunting 
+from simple querying.
+
+% --------------------------------------------------------------------
+% SECTION 2: Core Hunting Techniques
+% --------------------------------------------------------------------
+
+\subsection*{Core Hunting Techniques}
+
+Threat hunting relies on several foundational techniques:
+
+\begin{itemize}
+    \item \textbf{Filtering} — Narrowing down large datasets to relevant activity.
+    \item \textbf{Aggregation} — Grouping events to identify unusual patterns.
+    \item \textbf{Rarity analysis} — Finding activity that deviates from normal behavior.
+    \item \textbf{Behavioral correlation} — Connecting related events across multiple data sources.
+\end{itemize}
+
+These techniques form the basis of most hunting workflows.
+
+% --------------------------------------------------------------------
+% SECTION 3: Process Creation Hunting
+% --------------------------------------------------------------------
+
+\subsection*{Process Creation Hunting}
+
+One of the most common starting points in a hunt is process creation activity. Sysmon Event ID 1 provides detailed 
+insight into how processes are launched, including parent-child relationships and command-line arguments. The 
+following example searches for suspicious PowerShell usage, a frequent indicator of malicious activity.
+
+\textbf{SPL Example}
+
+\begin{lstlisting}
+index=sysmon EventCode=1 Image="*powershell.exe"
+| search CommandLine="*EncodedCommand*"
+| table _time, Computer, User, ParentImage, Image, CommandLine
+\end{lstlisting}
+
+\textbf{KQL Equivalent}
+
+\begin{lstlisting}
+Sysmon
+| where EventID == 1 and Image endswith "powershell.exe"
+| where CommandLine contains "EncodedCommand"
+| project TimeGenerated, Computer, User, ParentImage, Image, CommandLine
+\end{lstlisting}
+
+% --------------------------------------------------------------------
+% SECTION 4: Rarity Analysis
+% --------------------------------------------------------------------
+
+\subsection*{Rarity Analysis}
+
+Adversaries often stand out not because their activity is obviously malicious, but because it is uncommon compared 
+to normal system patterns. The following example highlights rare parent-child process pairs.
+
+\textbf{SPL Example}
+
+\begin{lstlisting}
+index=sysmon EventCode=1
+| stats count by ParentImage, Image
+| where count < 3
+\end{lstlisting}
+
+\textbf{KQL Equivalent}
+
+\begin{lstlisting}
+Sysmon
+| where EventID == 1
+| summarize Count=count() by ParentImage, Image
+| where Count < 3
+\end{lstlisting}
+
+% --------------------------------------------------------------------
+% SECTION 5: Authentication Hunting
+% --------------------------------------------------------------------
+
+\subsection*{Authentication Hunting}
+
+Authentication activity is another rich source of hunting leads. Repeated failed logons, unusual logon types, or 
+logons from unexpected hosts can indicate credential misuse or lateral movement. The following example identifies 
+accounts with excessive failed logons.
+
+\textbf{SPL Example}
+
+\begin{lstlisting}
+index=wineventlog EventCode=4625
+| stats count by AccountName, WorkstationName
+| where count > 10
+\end{lstlisting}
+
+\textbf{KQL Equivalent}
+
+\begin{lstlisting}
+SecurityEvent
+| where EventID == 4625
+| summarize Count=count() by Account, Workstation
+| where Count > 10
+\end{lstlisting}
+
+% --------------------------------------------------------------------
+% SECTION 6: Network Hunting
+% --------------------------------------------------------------------
+
+\subsection*{Network Hunting}
+
+Network telemetry plays a critical role in hunting. DNS logs, proxy logs, and NetFlow data can reveal command-and-control 
+activity, data exfiltration, or lateral movement. The following example identifies rare outbound connections.
+
+\textbf{SPL Example}
+
+\begin{lstlisting}
+index=sysmon EventCode=3
+| stats count by DestinationIp, DestinationPort
+| where count < 5
+\end{lstlisting}
+
+\textbf{KQL Equivalent}
+
+\begin{lstlisting}
+Sysmon
+| where EventID == 3
+| summarize Count=count() by DestinationIp, DestinationPort
+| where Count < 5
+\end{lstlisting}
+
+% --------------------------------------------------------------------
+% SECTION 7: Why These Fundamentals Matter
+% --------------------------------------------------------------------
+
+\subsection*{Why These Fundamentals Matter}
+
+Threat hunting is ultimately about pattern recognition and curiosity. The examples in this chapter demonstrate the 
+foundational techniques—filtering, aggregation, rarity analysis, and behavioral correlation—that underpin more advanced 
+hunts. Later chapters expand these fundamentals into full hunting playbooks and detection patterns that reflect real-world 
+adversary behavior.

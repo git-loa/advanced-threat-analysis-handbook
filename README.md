@@ -1,3 +1,4 @@
+
 # **Advanced Threat Analysis and Detection Engineering Handbook**
 
 This handbook is a comprehensive, long-term reference for analysts working across Cyber Threat Intelligence (CTI), threat hunting, detection engineering, and SIEM operations. It is designed to support real-world investigations using Splunk (SPL), Microsoft Sentinel (KQL), and Linux endpoint telemetry. The content is structured to reflect the workflows, techniques, and analytical approaches used by modern security teams.
@@ -13,7 +14,7 @@ The goal of this handbook is to unify CTI, threat hunting, detection engineering
 - Understand adversary behaviors and translate them into operational detections  
 - Build high-fidelity SPL and KQL queries  
 - Develop repeatable hunting and detection playbooks  
-- Investigate Linux systems effectively  
+- Investigate Windows and Linux systems effectively  
 - Create dashboards that support real-time monitoring  
 - Apply CTI workflows to guide hunts and detections  
 - Develop advanced detection patterns that remain resilient over time  
@@ -26,16 +27,17 @@ The handbook is organized into modular sections, each focusing on a core area of
 
 1. **Introduction**  
 2. **Splunk and SPL Fundamentals**  
-3. **Threat Hunting Fundamentals**  
-4. **Detection Engineering Fundamentals**  
-5. **Dashboard Creation**  
-6. **Linux Investigation Commands**  
-7. **CTI Workflows**  
-8. **Threat Hunting Playbooks**  
-9. **Detection Playbooks**  
-10. **Advanced Detection Patterns**  
+3. **Windows Investigations**  
+4. **Linux Investigations**  
+5. **Threat Hunting Fundamentals**  
+6. **Detection Engineering Fundamentals**  
+7. **Dashboard Design**  
+8. **CTI Workflows**  
+9. **Threat Hunting Playbooks**  
+10. **Detection Playbooks**  
+11. **Advanced Detection Patterns**  
 
-Each section is stored as a standalone LaTeX file under `parts/` and imported through `main.tex`.
+Each section is stored as a standalone LaTeX file under `sections/` and imported through `main.tex`.
 
 ---
 
@@ -43,6 +45,7 @@ Each section is stored as a standalone LaTeX file under `parts/` and imported th
 
 - **Splunk (SPL)**  
 - **Microsoft Sentinel (KQL)**  
+- **Windows Endpoint Analysis**  
 - **Linux Endpoint Analysis**  
 - **CTI Integration**  
 - **Behavioral Detection Concepts**  
@@ -126,17 +129,18 @@ advanced-threat-analysis-handbook/
 ├── LICENSE
 ├── .gitignore
 │
-├── parts/
-│   ├── introduction.tex
-│   ├── spl_fundamentals.tex
-│   ├── threat_hunting_fundamentals.tex
-│   ├── detection_engineering_fundamentals.tex
-│   ├── dashboard_design.tex
-│   ├── linux_investigations.tex
-│   ├── cti_workflows.tex
-│   ├── threat_hunting_playbooks.tex
-│   ├── detection_playbooks.tex
-│   └── advanced_detection_patterns.tex
+├── sections/
+│   ├── 001_introduction.tex
+│   ├── 002_spl_fundamentals.tex
+│   ├── 003_windows_investigations.tex
+│   ├── 004_linux_investigations.tex
+│   ├── 005_threat_hunting_fundamentals.tex
+│   ├── 006_detection_engineering_fundamentals.tex
+│   ├── 007_dashboard_design.tex
+│   ├── 008_cti_workflows.tex
+│   ├── 009_threat_hunting_playbooks.tex
+│   ├── 010_detection_playbooks.tex
+│   └── 011_advanced_detection_patterns.tex
 │
 └── .github/workflows/
     └── build-pdf.yml
@@ -155,9 +159,9 @@ You may adapt or extend it for your own learning or internal organizational use.
 
 Created by **Leonard**, Toronto-based analyst specializing in:
 
-- **Cyber Threat Intelligence**  
-- **Threat Hunting**  
-- **Detection Engineering**  
-- **SIEM Operations**  
-- **Endpoint Analysis**  
-- **Post‑Quantum Cryptography Research**  
+- Cyber Threat Intelligence  
+- Threat Hunting  
+- Detection Engineering  
+- SIEM Operations  
+- Endpoint Analysis  
+- Post‑Quantum Cryptography Research  

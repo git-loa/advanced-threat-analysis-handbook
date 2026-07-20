@@ -1,0 +1,173 @@
+\section{Dashboard Creation}
+
+Dashboards transform raw telemetry into visual insights that help analysts monitor activity, validate detections, 
+and identify anomalies at scale. For CTI analysts, threat hunters, and detection engineers, dashboards serve two 
+primary purposes: they provide situational awareness, and they act as investigative starting points. A well‑designed 
+dashboard highlights deviations from normal behavior, exposes suspicious trends, and allows analysts to pivot quickly 
+into deeper searches. This chapter introduces the core principles of dashboard design and provides practical SPL and 
+KQL examples that can be used to build effective visualizations in Splunk and Microsoft Sentinel.
+
+% --------------------------------------------------------------------
+% SECTION 1: Dashboard Design Philosophy
+% --------------------------------------------------------------------
+
+\subsection*{Dashboard Design Philosophy}
+
+A good dashboard begins with a clear objective. Instead of trying to visualize everything, focus on the behaviors 
+that matter most: process execution, authentication patterns, network activity, and high‑risk events. Each panel 
+should answer a specific investigative question, such as:
+
+\begin{itemize}
+    \item “Which processes are most active?”
+    \item “Which accounts are failing logons?”
+    \item “Which hosts are making rare outbound connections?”
+    \item “Which events indicate high‑risk behavior?”
+\end{itemize}
+
+By structuring dashboards around investigative questions, you ensure that each visualization provides actionable 
+insight rather than noise.
+
+% --------------------------------------------------------------------
+% SECTION 2: Process Activity Panel
+% --------------------------------------------------------------------
+
+\subsection*{Process Activity Panel}
+
+Process creation is one of the most valuable signals for both hunting and detection engineering. A dashboard panel 
+that highlights the most common processes helps establish a baseline and makes anomalies easier to spot.
+
+\textbf{SPL Example}
+
+\begin{lstlisting}
+index=sysmon EventCode=1
+| stats count by Image
+| sort - count
+\end{lstlisting}
+
+\textbf{KQL Equivalent}
+
+\begin{lstlisting}
+Sysmon
+| where EventID == 1
+| summarize Count=count() by Image
+| order by Count desc
+\end{lstlisting}
+
+This panel helps analysts quickly identify unusual binaries or unexpected spikes in activity.
+
+% --------------------------------------------------------------------
+% SECTION 3: Authentication Trends Panel
+% --------------------------------------------------------------------
+
+\subsection*{Authentication Trends Panel}
+
+Authentication logs reveal credential misuse, brute‑force attempts, and lateral movement. A dashboard panel that 
+tracks failed logons over time provides early warning of suspicious behavior.
+
+\textbf{SPL Example}
+
+\begin{lstlisting}
+index=wineventlog EventCode=4625
+| timechart count by AccountName
+\end{lstlisting}
+
+\textbf{KQL Equivalent}
+
+\begin{lstlisting}
+SecurityEvent
+| where EventID == 4625
+| summarize Count=count() by bin(TimeGenerated, 1h), Account
+| render timechart
+\end{lstlisting}
+
+This visualization helps identify targeted accounts or sudden increases in authentication failures.
+
+% --------------------------------------------------------------------
+% SECTION 4: Network Activity Panel
+% --------------------------------------------------------------------
+
+\subsection*{Network Activity Panel}
+
+Network telemetry is essential for detecting command‑and‑control activity, lateral movement, and exfiltration. 
+A dashboard panel that highlights rare outbound connections can reveal early signs of compromise.
+
+\textbf{SPL Example}
+
+\begin{lstlisting}
+index=sysmon EventCode=3
+| stats count by DestinationIp, DestinationPort
+| where count < 5
+\end{lstlisting}
+
+\textbf{KQL Equivalent}
+
+\begin{lstlisting}
+Sysmon
+| where EventID == 3
+| summarize Count=count() by DestinationIp, DestinationPort
+| where Count < 5
+\end{lstlisting}
+
+This panel surfaces low‑frequency connections that may indicate malicious activity.
+
+% --------------------------------------------------------------------
+% SECTION 5: High‑Risk Event Panel
+% --------------------------------------------------------------------
+
+\subsection*{High‑Risk Event Panel}
+
+Some events are inherently high‑risk and deserve dedicated visibility. Examples include PowerShell execution, 
+scheduled task creation, and privilege escalation attempts. A dashboard panel that highlights these events helps 
+analysts quickly identify suspicious behavior.
+
+\textbf{SPL Example}
+
+\begin{lstlisting}
+index=sysmon (EventCode=1 Image="*powershell.exe") OR EventCode=13 OR EventCode=7
+| stats count by EventCode, Image, User
+\end{lstlisting}
+
+\textbf{KQL Equivalent}
+
+\begin{lstlisting}
+Sysmon
+| where EventID in (1, 7, 13)
+| summarize Count=count() by EventID, Image, User
+\end{lstlisting}
+
+This panel consolidates multiple high‑risk signals into a single view.
+
+% --------------------------------------------------------------------
+% SECTION 6: Dashboard Layout Principles
+% --------------------------------------------------------------------
+
+\subsection*{Dashboard Layout Principles}
+
+Effective dashboards follow a few simple principles:
+
+\begin{itemize}
+    \item \textbf{Broad → Specific}  
+    Start with high‑level trends (process volume, authentication failures) and move toward detailed insights.
+
+    \item \textbf{Minimal clutter}  
+    Use clear labels, simple charts, and avoid unnecessary visual noise.
+
+    \item \textbf{Actionable panels}  
+    Every panel should support a pivot into deeper investigation.
+
+    \item \textbf{Feedback-driven refinement}  
+    Dashboards should evolve based on analyst usage and emerging threat behavior.
+\end{itemize}
+
+A dashboard is not a static artifact—it is a living tool that improves as your environment and adversaries change.
+
+% --------------------------------------------------------------------
+% SECTION 7: Why Dashboards Matter
+% --------------------------------------------------------------------
+
+\subsection*{Why Dashboards Matter}
+
+Dashboards provide continuous visibility into system behavior, highlight anomalies, and support both hunting and 
+detection workflows. They help analysts validate detections, monitor trends, and quickly identify suspicious activity. 
+Later chapters expand these concepts into full dashboard layouts and advanced visualizations tailored to specific 
+adversary techniques.

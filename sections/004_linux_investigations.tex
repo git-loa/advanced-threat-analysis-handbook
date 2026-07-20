@@ -1,0 +1,171 @@
+\section{Linux Investigations}
+
+Linux systems are common targets in enterprise environments, especially in cloud, container, and server workloads. 
+Understanding how to investigate Linux endpoints is essential for CTI analysts, threat hunters, and detection engineers. 
+While SIEM telemetry provides high-level visibility, direct Linux commands offer immediate insight into processes, users, 
+network activity, and system integrity. This chapter provides a focused set of commands that support real-world investigations, 
+along with explanations of when and why each command is useful.
+
+% --------------------------------------------------------------------
+% SECTION 1: Core Linux Telemetry Sources
+% --------------------------------------------------------------------
+
+\subsection*{Core Linux Telemetry Sources}
+
+Linux investigations rely on several key data sources:
+
+\begin{itemize}
+    \item \textbf{Process telemetry} — \texttt{ps}, \texttt{top}, \texttt{lsof}
+    \item \textbf{Network telemetry} — \texttt{ss}, \texttt{netstat}
+    \item \textbf{Authentication logs} — \texttt{/var/log/auth.log}, \texttt{/var/log/secure}
+    \item \textbf{File integrity} — \texttt{find}, \texttt{stat}, \texttt{inotify}
+    \item \textbf{Service and startup telemetry} — \texttt{systemctl}, \texttt{journalctl}
+    \item \textbf{auditd} — kernel-level forensic logging
+\end{itemize}
+
+These sources form the foundation of Linux endpoint investigations.
+
+% --------------------------------------------------------------------
+% SECTION 2: Process Investigation
+% --------------------------------------------------------------------
+
+\subsection*{Process Investigation}
+
+Investigations often begin with understanding what is running on a system. The \texttt{ps} and \texttt{top} utilities 
+reveal active processes, their parent-child relationships, and resource usage. These commands help identify suspicious 
+binaries, unexpected services, or processes running under unusual accounts.
+
+\textbf{List all running processes}
+
+\begin{lstlisting}[language=bash]
+ps aux
+\end{lstlisting}
+
+To investigate a specific process, analysts often need to inspect its parent process, command-line arguments, and open files. 
+The \texttt{lsof} command is particularly valuable for identifying network connections or files associated with a suspicious process.
+
+\textbf{Inspect open files for a process}
+
+\begin{lstlisting}[language=bash]
+lsof -p <PID>
+\end{lstlisting}
+
+% --------------------------------------------------------------------
+% SECTION 3: Network Investigation
+% --------------------------------------------------------------------
+
+\subsection*{Network Investigation}
+
+Network visibility is essential for detecting unauthorized services, reverse shells, or unexpected outbound traffic. 
+Commands such as \texttt{ss} and \texttt{netstat} reveal active connections, listening ports, and associated processes.
+
+\textbf{List listening ports and associated processes}
+
+\begin{lstlisting}[language=bash]
+ss -tulnp
+\end{lstlisting}
+
+This helps identify suspicious listeners, unexpected services, or malware establishing command-and-control channels.
+
+% --------------------------------------------------------------------
+% SECTION 4: Authentication Investigation
+% --------------------------------------------------------------------
+
+\subsection*{Authentication Investigation}
+
+Authentication and privilege misuse are common indicators of compromise. Linux logs authentication events in 
+\texttt{/var/log/auth.log} (Debian-based systems) or \texttt{/var/log/secure} (RHEL-based systems).
+
+\textbf{View recent authentication events}
+
+\begin{lstlisting}[language=bash]
+grep "session" /var/log/auth.log
+\end{lstlisting}
+
+This reveals logons, sudo usage, SSH sessions, and privilege escalation attempts.
+
+% --------------------------------------------------------------------
+% SECTION 5: File Integrity and Persistence
+% --------------------------------------------------------------------
+
+\subsection*{File Integrity and Persistence}
+
+Attackers often modify system binaries, create persistence mechanisms, or drop malicious files. 
+The \texttt{find} command helps locate recently modified files, which can reveal tampering or unauthorized activity.
+
+\textbf{Find recently modified files}
+
+\begin{lstlisting}[language=bash]
+find / -type f -mtime -1 2>/dev/null
+\end{lstlisting}
+
+System services and startup mechanisms are frequent targets for persistence. The \texttt{systemctl} command provides insight 
+into active services, failed services, and recently modified units.
+
+\textbf{List active services}
+
+\begin{lstlisting}[language=bash]
+systemctl list-units --type=service
+\end{lstlisting}
+
+% --------------------------------------------------------------------
+% SECTION 6: auditd and Forensic Logging
+% --------------------------------------------------------------------
+
+\subsection*{auditd and Forensic Logging}
+
+For deeper forensic analysis, \texttt{auditd} provides detailed system call logging, including file access, privilege escalation 
+attempts, and execution events. When enabled, audit logs can be queried directly.
+
+\textbf{Search for execution events}
+
+\begin{lstlisting}[language=bash]
+ausearch -m EXECVE
+\end{lstlisting}
+
+auditd is particularly useful for detecting:
+
+\begin{itemize}
+    \item privilege escalation
+    \item unauthorized file access
+    \item suspicious command execution
+    \item persistence mechanisms
+\end{itemize}
+
+% --------------------------------------------------------------------
+% SECTION 7: SIEM Pivots (SPL + KQL)
+% --------------------------------------------------------------------
+
+\subsection*{Pivoting to SIEM Telemetry}
+
+Linux investigations often require correlating endpoint findings with SIEM telemetry. 
+For example, a suspicious process discovered with \texttt{ps aux} can be cross-referenced with Sysmon for Linux 
+or audit logs ingested into Splunk or Sentinel.
+
+\textbf{SPL Example}
+
+\begin{lstlisting}
+index=linux_logs process_name="bash"
+| table _time, host, user, parent_process, command
+\end{lstlisting}
+
+\textbf{KQL Equivalent}
+
+\begin{lstlisting}
+LinuxSysmon
+| where ProcessName == "bash"
+| project TimeGenerated, HostName, User, ParentProcessName, CommandLine
+\end{lstlisting}
+
+These pivots allow analysts to connect endpoint-level findings with SIEM-level visibility.
+
+% --------------------------------------------------------------------
+% SECTION 8: Why Linux Investigations Matter
+% --------------------------------------------------------------------
+
+\subsection*{Why Linux Investigations Matter}
+
+Linux systems underpin critical infrastructure, cloud workloads, and enterprise applications. 
+Mastering Linux investigations provides visibility into execution, authentication, persistence, and network behavior. 
+These techniques form the foundation of Linux threat hunting and incident response. Later chapters expand these fundamentals 
+into full hunting playbooks and detection patterns tailored to Linux environments.
